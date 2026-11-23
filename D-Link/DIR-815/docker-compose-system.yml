@@ -1,0 +1,27 @@
+services:
+  system-emu:
+    build:
+      context: ./system-emu
+    image: iot-vulhub/dir815-system:latest
+    # mkfs.ext4 需要 root;QEMU 建 tap 需要 NET_ADMIN
+    privileged: true
+    tty: true
+    stdin_open: true
+    working_dir: /env
+    volumes:
+      - ./squashfs-root:/env/squashfs-root:ro
+      - ./system-emu/images:/env/images:ro
+      - ./system-emu/work:/env/work
+      - ./system-emu/run.sh:/env/run.sh:ro
+    environment:
+      ARCH: ${ARCH:-mipsel}
+      ROOTFS: /env/squashfs-root
+      IMAGES: /env/images
+      IMGDIR: /env/work
+      MACHINE: ${MACHINE:-malta}
+      MODE: ${MODE:-run}
+      # KERNEL: /env/images/vmlinux-mipsel.elf   # 不设则自动在 images/ 里找
+    ports:
+      - "8888:8888"
+      - "2222:2222"
+      - "6666:6666"

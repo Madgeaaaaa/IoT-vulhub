@@ -1,0 +1,14 @@
+* text=auto
+
+# 脚本必须在 Linux 下可执行,强制 LF
+*.sh text eol=lf
+*.py text eol=lf
+*.c text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+Dockerfile text eol=lf
+
+# 二进制勿转换
+*.bin binary
+*.png binary
+*.jpg binary

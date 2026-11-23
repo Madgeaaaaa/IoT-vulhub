@@ -1,0 +1,28 @@
+# 固件本体:体积大且有版权,不入库
+**/firmware/*.bin
+**/firmware/*.zip
+**/firmware/*.tar
+**/firmware/*.gz
+**/firmware/*.img
+**/firmware/*.chk
+
+# 解包产物
+**/squashfs-root/
+**/_*.extracted/
+**/*.extracted/
+
+# 仿真产生的镜像与日志
+**/system-emu/images/*
+!**/system-emu/images/.gitkeep
+**/system-emu/work/
+**/firmae/scratch/
+**/firmae/FirmAE/
+**/rootfs.ext4
+**/*.qcow2
+
+# 运行时
+.env
+*.log
+__pycache__/
+*.pyc
+.venv/

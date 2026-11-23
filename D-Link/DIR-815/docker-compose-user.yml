@@ -1,0 +1,19 @@
+services:
+  user-emu:
+    build:
+      context: ./user-emu
+    image: iot-vulhub/dir815-user:latest
+    volumes:
+      - ./squashfs-root:/rootfs:ro
+      - ./user-emu/run.sh:/env/run.sh:ro
+    environment:
+      ARCH: ${ARCH:-mipsel}
+      ROOTFS: /rootfs
+      CGI: ${CGI:-/htdocs/web/hedwig.cgi}
+      MODE: ${MODE:-run}
+      PAYLOAD: ${PAYLOAD:-}
+    # gdbserver 端口
+    ports:
+      - "6666:6666"
+    tty: true
+    stdin_open: true
