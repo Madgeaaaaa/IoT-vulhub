@@ -3,6 +3,30 @@
 目标：让固件里的 `httpd` 真的对外提供 HTTP 服务，从而能在**完整链路**上测漏洞
 （尤其是需要 `$_POST` 的 `getcfg.php`）。
 
+## 0. 两条路线对比（都试过了）
+
+| | chroot + qemu-user | QEMU system（本文主方案） |
+|---|---|---|
+| 启动时间 | **~5 秒** | ~16 秒 |
+| 需要内核 | ❌ 不需要 | ✅ Debian 4kc-malta |
+| 需要 Docker | ❌ | ❌ |
+| 需要 root | 需要 userns 造"假 root"(`unshare -rmnp`) | ❌（initramfs 里天然是 root） |
+| init 序列 / 内核模块 | ❌ 没有 | ✅ |
+| httpd 监听 + HTTP 响应 | ✅ **已验证** | ✅ 已验证 |
+| PHP（phpcgi） | ❌ 500 | ❌ 500 |
+| 脚本 | [`tools/run-chroot.sh`](../D-Link/DIR-815/tools/run-chroot.sh) | [`tools/boot-full.sh`](../D-Link/DIR-815/tools/boot-full.sh) |
+
+**关键结论：两条路线卡在同一个地方——`phpcgi`。**
+换成 chroot 不会解决问题，它只是启动更快、更轻。
+
+chroot 路线的两个坑：
+
+1. **`httpd` 的 `Interface` 指令要 `CAP_NET_RAW`**，普通用户/proot 下绑定会失败
+   → 用 `unshare -rmnp` 进 user namespace 才拿得到
+2. **`mknod` 在 user namespace 里被内核拒绝**（`Operation not permitted`），
+   连 userns 自己挂的 tmpfs 也不行 → 改成**单文件 `mount --bind /dev/null`**
+   （注意：不能整个 bind `/dev`，devtmpfs 在 userns 里挂不上去）
+
 ## 1. 为什么不用 FirmAE
 
 FirmAE 是最省事的路，但它依赖 Docker；本机 Docker 拉 `registry-1.docker.io`
