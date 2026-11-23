@@ -9,10 +9,11 @@ services:
     environment:
       ARCH: ${ARCH:-mipsel}
       ROOTFS: /rootfs
-      CGI: ${CGI:-/htdocs/web/hedwig.cgi}
+      # hedwig.cgi 是 cgibin 里的虚拟入口,不是文件
+      ENTRY: ${ENTRY:-/hedwig.cgi}
       MODE: ${MODE:-run}
+      LEN: ${LEN:-1038}
       PAYLOAD: ${PAYLOAD:-}
-    # gdbserver 端口
     ports:
       - "6666:6666"
     tty: true
