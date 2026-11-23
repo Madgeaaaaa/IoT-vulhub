@@ -1,7 +1,8 @@
 # D-Link DIR-815 固件仿真环境
 
-> **状态：漏洞已复现。** `hedwig.cgi` 的 Cookie 溢出在 Rev B1 固件中实测存在，
-> 最小触发长度 **1038 字节**。完整记录见 [docs/repro.md](../../docs/repro.md)。
+> **状态：漏洞已复现。** `hedwig.cgi` 的 Cookie 溢出在 Rev B1 固件中实测存在：
+> uid 值 **1036** 字节起出现异常信号（SIGBUS），**1038** 字节起稳定 SIGSEGV。
+> 完整记录见 [docs/repro.md](../../docs/repro.md)。
 
 ## 1. 目标设备
 
@@ -32,7 +33,7 @@
   实际 handler 是 `hedwigcgi_main`
 - **类型**：处理过长 Cookie（`uid=`）时**栈溢出**，可导致远程代码执行
 - **前置**：只处理 `POST`，无需认证
-- **实测**：Cookie 值 ≥ **1038** 字节 → SIGSEGV；1037 及以下正常
+- **实测**：uid 值 1035 字节正常 → 1036 SIGBUS → 1037 SIGILL → **1038+ SIGSEGV**
 
 ⚠️ **`hedwig.cgi` 在磁盘上并不存在**。这个固件里没有任何 `*.cgi` 文件，
 13 个 CGI 入口（`hedwig.cgi`、`session.cgi`、`soap.cgi`、`gena.cgi`、
@@ -121,8 +122,8 @@ cd D-Link/DIR-815
 # 会自动 apt-get download qemu-user-static 并解出静态二进制(不需要 sudo)
 ROOTFS=~/work/dir815/squashfs-root ./tools/run-local.sh
 
-# 不崩的边界
-ROOTFS=~/work/dir815/squashfs-root LEN=1037 ./tools/run-local.sh
+# 刚好不崩的边界(uid=1035)
+ROOTFS=~/work/dir815/squashfs-root LEN=1035 ./tools/run-local.sh
 
 # 换入口
 ROOTFS=~/work/dir815/squashfs-root ENTRY=/session.cgi ./tools/run-local.sh
@@ -199,7 +200,7 @@ curl / 浏览器 ─────────────────► FirmAE �
 
 - [x] 确认固件版本与架构（Rev B1 / RT3052 / mipsel / LZMA squashfs）
 - [x] 确认 `hedwigcgi_main` 存在于 B 版 cgibin
-- [x] 用 qemu-user 复现崩溃，定位最小触发长度 1038
+- [x] 用 qemu-user 复现崩溃，逐字节定位（1036 起异常，1038 起 SIGSEGV）
 - [ ] gdb 精确定位到 `$ra` 的偏移
 - [ ] 构造 ROP 链，把"打崩"升级为"命令执行"
 - [ ] FirmAE 全系统跑通 + 后台截图
