@@ -1,8 +1,10 @@
 # D-Link DIR-815 固件仿真环境
 
-> **状态：漏洞已复现。** `hedwig.cgi` 的 Cookie 溢出在 Rev B1 固件中实测存在：
-> uid 值 **1036** 字节起出现异常信号（SIGBUS），**1038** 字节起稳定 SIGSEGV。
-> 完整记录见 [docs/repro.md](../../docs/repro.md)。
+> **状态：漏洞已复现，并做到任意代码执行。** `hedwig.cgi` 的 Cookie 溢出在 Rev B1
+> 固件中实测存在：uid 值 **1036** 字节起出现异常信号（SIGBUS），**1038** 字节起稳定
+> SIGSEGV；`$ra` 位于 **payload[1043..1046]**，可劫持控制流执行栈上 shellcode
+> 并调用任意 libc 函数（已验证 `exit(42)`）。
+> 完整记录见 [docs/repro.md](../../docs/repro.md) 与 [docs/exploit-dev.md](../../docs/exploit-dev.md)。
 
 ## 1. 目标设备
 
@@ -201,6 +203,7 @@ curl / 浏览器 ─────────────────► FirmAE �
 - [x] 确认固件版本与架构（Rev B1 / RT3052 / mipsel / LZMA squashfs）
 - [x] 确认 `hedwigcgi_main` 存在于 B 版 cgibin
 - [x] 用 qemu-user 复现崩溃，逐字节定位（1036 起异常，1038 起 SIGSEGV）
-- [ ] gdb 精确定位到 `$ra` 的偏移
-- [ ] 构造 ROP 链，把"打崩"升级为"命令执行"
+- [x] gdb 定位 `$ra` 偏移 = **payload[1043..1046]**，`$s0`–`$s8` 同时可控
+- [x] 跳栈执行 shellcode，调 libc `exit(42)` 验证**任意代码执行**（见 [docs/exploit-dev.md](../../docs/exploit-dev.md)）
+- [ ] `system()` 执行 shell 命令（当前受 qemu-user 的 fork/exec 限制，返回 127）
 - [ ] FirmAE 全系统跑通 + 后台截图
