@@ -11,7 +11,7 @@ IoT 固件漏洞复现环境合集。目录组织参考 [vulhub](https://github.
 
 | 厂商 | 目标 | 内容 | 状态 |
 |---|---|---|---|
-| D-Link | DIR-815 | 全系统仿真 + `hedwig.cgi` Cookie 栈溢出验证 | 搭建中 |
+| D-Link | DIR-815（Rev B1 / RT3052） | 全系统仿真 + `hedwig.cgi` Cookie 栈溢出验证 | 环境就绪，待跑通 |
 
 ## 目录约定
 

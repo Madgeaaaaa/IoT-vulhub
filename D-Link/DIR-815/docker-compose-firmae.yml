@@ -15,6 +15,6 @@ services:
     environment:
       BRAND: ${BRAND:-dlink}
       # 注意:这是容器内路径,不是宿主机路径
-      FW: ${FW_CONTAINER:-/firmware/DIR815A1_FW103b01.bin}
+      FW: ${FW_CONTAINER:-/firmware/DIR815_revB_FW_V2.02b01.bin}
       MODE: ${MODE:-r}
     command: ["/bin/bash"]

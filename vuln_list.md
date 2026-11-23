@@ -4,7 +4,9 @@
 
 ## D-Link
 
-- *EXP* | [DIR-815 固件仿真环境（hedwig.cgi Cookie 栈溢出）](./D-Link/DIR-815)
+- *EXP* | [DIR-815（Rev B1 / RT3052）固件仿真环境](./D-Link/DIR-815)
+  - 固件 `DIR815_revB_FW_V2.02b01.bin`，squashfs 4.0 + LZMA
+  - 目标漏洞：`hedwig.cgi` Cookie 栈溢出
 
 ## TODO
 
