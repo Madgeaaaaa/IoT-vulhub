@@ -26,3 +26,10 @@
 __pycache__/
 *.pyc
 .venv/
+
+# Netgear 环境的大文件
+Netgear/**/images/*.qcow2
+Netgear/**/images/vmlinuz*
+Netgear/**/images/initrd*
+Netgear/**/firmware/*.sqsh
+Netgear/**/firmware/_*/
